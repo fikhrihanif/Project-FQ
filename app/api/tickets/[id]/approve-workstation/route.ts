@@ -42,8 +42,6 @@ export async function POST(_req: Request, { params }: Params) {
       where: { id },
       data: {
         statusSupervisi: "approved",
-        status: "selesai",
-        waktuSelesai: new Date(),
       },
       select: { id: true, noTiket: true, statusSupervisi: true },
     });

@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 
 const DAFTAR_CABANG = [
   "PAYAKUMBUH",
@@ -156,33 +157,26 @@ export function WorkstationForm() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <AnimatePresence>
-        {created && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-          >
-            <Card className="border-green-200 bg-green-50/60 flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm text-gray-700">
-                  Tiket Workstation berhasil dibuka dengan nomor
-                </p>
-                <p className="text-lg font-bold font-mono text-green-700">
-                  {created}
-                </p>
-              </div>
-              <button
-                onClick={() => setCreated(null)}
-                className="p-1.5 rounded-md text-gray-400 hover:bg-white hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Modal
+        open={Boolean(created)}
+        onClose={() => setCreated(null)}
+        title=""
+        size="sm"
+      >
+        <div className="flex flex-col items-center justify-center text-center p-4">
+          <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center text-green-600 mb-4 animate-bounce">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Tiket Berhasil Dibuka!</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Tiket Workstation berhasil dibuat dengan nomor seri tiket:
+            <span className="block mt-2 font-bold font-mono text-xl text-green-700 bg-green-50 px-3 py-1.5 rounded-md border border-green-100">{created}</span>
+          </p>
+          <Button onClick={() => setCreated(null)} className="w-full">
+            Tutup &amp; Buat Tiket Lain
+          </Button>
+        </div>
+      </Modal>
 
       <Card padding="lg">
         <form onSubmit={submit} className="space-y-6">

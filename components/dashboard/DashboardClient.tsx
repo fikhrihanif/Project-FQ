@@ -43,16 +43,16 @@ export function DashboardClient({ initialData }: Props) {
   }, [refresh]);
 
   const markedDates = useMemo(
-    () => new Set(data.openTickets.map((t) => fmtDateKey(t.waktuOpen))),
-    [data.openTickets]
+    () => new Set(data.recentTickets.map((t) => fmtDateKey(t.waktuOpen))),
+    [data.recentTickets]
   );
 
   const dayTickets = useMemo(
     () =>
       selected
-        ? data.openTickets.filter((t) => fmtDateKey(t.waktuOpen) === selected)
+        ? data.recentTickets.filter((t) => fmtDateKey(t.waktuOpen) === selected)
         : [],
-    [selected, data.openTickets]
+    [selected, data.recentTickets]
   );
 
   return (

@@ -16,6 +16,14 @@ export interface DashboardData {
     waktuOpen: Date;
     ownerNama: string;
   }[];
+  recentTickets: {
+    id: string;
+    noTiket: string;
+    wsCabang: string;
+    wsMerekKomputer: string | null;
+    waktuOpen: Date;
+    ownerNama: string;
+  }[];
   generatedAt: string;
 }
 
@@ -25,21 +33,34 @@ export async function getDashboardData(currentUserId?: string): Promise<Dashboar
   const whereSelesai: Prisma.TicketWhereInput = {
     kategori: "workstation",
     status: "selesai",
-    statusSupervisi: "approved",
   };
 
-  if (currentUserId) {
-    // If needed, filter can be added here
-  }
-
-  const [total, proses, selesai, openList] = await Promise.all([
+  const [total, proses, selesai, openList, recentList] = await Promise.all([
     prisma.ticket.count({ where: whereTotal }),
     prisma.ticket.count({ where: whereProses }),
     prisma.ticket.count({ where: whereSelesai }),
     prisma.ticket.findMany({
       where: whereProses,
       orderBy: { waktuOpen: "desc" },
-      take: 10,
+      select: {
+        id: true,
+        noTiket: true,
+        wsCabang: true,
+        wsMerekKomputer: true,
+        waktuOpen: true,
+        owner: {
+          select: { nama: true },
+        },
+      },
+    }),
+    prisma.ticket.findMany({
+      where: {
+        kategori: "workstation",
+        waktuOpen: {
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // last 30 days
+        },
+      },
+      orderBy: { waktuOpen: "desc" },
       select: {
         id: true,
         noTiket: true,
@@ -56,6 +77,14 @@ export async function getDashboardData(currentUserId?: string): Promise<Dashboar
   return {
     counts: { total, proses, selesai },
     openTickets: openList.map((t) => ({
+      id: t.id,
+      noTiket: t.noTiket,
+      wsCabang: t.wsCabang,
+      wsMerekKomputer: t.wsMerekKomputer,
+      waktuOpen: t.waktuOpen,
+      ownerNama: t.owner.nama,
+    })),
+    recentTickets: recentList.map((t) => ({
       id: t.id,
       noTiket: t.noTiket,
       wsCabang: t.wsCabang,

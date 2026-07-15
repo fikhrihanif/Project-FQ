@@ -81,6 +81,7 @@ export function DailyMonitoringClient({
                   <Th>No Tiket</Th>
                   <Th>Cabang</Th>
                   <Th>Merek Komputer</Th>
+                  <Th>SN Komputer</Th>
                   <Th>Tanggal Masuk</Th>
                   <Th>Kerusakan</Th>
                   <Th>Petugas IT</Th>
@@ -99,6 +100,7 @@ export function DailyMonitoringClient({
                     </Td>
                     <Td className="font-medium text-gray-900">{t.wsCabang}</Td>
                     <Td>{t.wsMerekKomputer || "—"}</Td>
+                    <Td className="font-mono text-xs text-gray-600">{t.wsSnKomputer || "—"}</Td>
                     <Td className="whitespace-nowrap text-xs">
                       {t.wsTanggalMasuk ? fmtDateTime(t.wsTanggalMasuk) : "—"}
                     </Td>
