@@ -3,9 +3,11 @@
 import { cn } from "@/lib/cn";
 import { type Role } from "@/lib/constants";
 import { Badge } from "@/components/ui/Badge";
-import { Bell, ChevronDown, LogOut, User2 } from "lucide-react";
+import { Bell, ChevronDown, LogOut, User2, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
 
 const ROLE_LABELS: Record<Role, string> = {
   superadmin: "Super Admin",
@@ -24,9 +26,33 @@ export function Topbar({ user }: { user: SessionUser }) {
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [activeCount, setActiveCount] = useState(0);
 
   async function handleLogout() {
+    setDropdownOpen(false);
+    // Hanya periksa jika user adalah petugas IT Support atau Super Admin (yang mencatat log)
+    if (user.role !== "supervisi") {
+      try {
+        const res = await fetch("/api/server-log/active-count", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.activeCount > 0) {
+            setActiveCount(data.activeCount);
+            setShowWarningModal(true);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Gagal memeriksa log aktif:", err);
+      }
+    }
+    await executeLogout();
+  }
+
+  async function executeLogout() {
     setLoggingOut(true);
+    setShowWarningModal(false);
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
@@ -139,6 +165,45 @@ export function Topbar({ user }: { user: SessionUser }) {
           )}
         </div>
       </div>
+
+      {/* Modal Peringatan Logout */}
+      <Modal
+        open={showWarningModal}
+        onClose={() => setShowWarningModal(false)}
+        title="Pengunjung Belum Keluar!"
+        size="sm"
+      >
+        <div className="flex flex-col items-center text-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Peringatan Akses Server</p>
+            <p className="text-xs text-gray-500 mt-2">
+              Masih terdapat <span className="text-amber-600 font-bold">{activeCount} orang</span> di dalam ruang server yang belum mencatat waktu keluar.
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Apakah Anda yakin ingin tetap keluar/logout?
+            </p>
+          </div>
+          <div className="flex gap-2 w-full mt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setShowWarningModal(false)}
+              className="flex-1 text-xs"
+            >
+              Batalkan
+            </Button>
+            <Button
+              onClick={executeLogout}
+              loading={loggingOut}
+              className="flex-1 text-xs !bg-amber-500 hover:!bg-amber-600 border-0 text-white"
+            >
+              Ya, Tetap Keluar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </header>
   );
 }

@@ -8,6 +8,7 @@ import {
   Users,
   FolderOpen,
   MapPin,
+  ServerCog,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
@@ -80,6 +81,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Users,
     description: "Tambah & ubah akun User/Supervisi",
     roles: ["superadmin"],
+  },
+  {
+    label: "Log Server",
+    href: "/log-server",
+    icon: ServerCog,
+    description: "Monitoring akses keluar masuk ruang server",
+    roles: ["user", "superadmin", "supervisi"],
   },
   {
     label: "Setting",

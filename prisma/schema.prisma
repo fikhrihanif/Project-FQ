@@ -29,19 +29,42 @@ enum StatusSupervisi {
 }
 
 model User {
-  id             String           @id @default(cuid())
-  username       String           @unique
-  nama           String
-  role           Role             @default(user)
-  passwordHash   String           @map("password_hash")
-  fotoProfilUrl  String?          @map("foto_profil_url")
-  ttdUrl         String?          @map("ttd_url")
-  isAktif        Boolean          @default(true) @map("is_aktif")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  ticketsOwned   Ticket[]         @relation("TicketOwner")
-  activities     TicketActivity[]
+  id                 String              @id @default(cuid())
+  username           String              @unique
+  nama               String
+  role               Role                @default(user)
+  passwordHash       String              @map("password_hash")
+  fotoProfilUrl      String?             @map("foto_profil_url")
+  ttdUrl             String?             @map("ttd_url")
+  isAktif            Boolean             @default(true) @map("is_aktif")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  ticketsOwned       Ticket[]            @relation("TicketOwner")
+  activities         TicketActivity[]
+  serverLogs         ServerAccessLog[]   @relation("LogPencatat")
+  serverLogsApproved ServerAccessLog[]   @relation("LogApprover")
 
   @@map("users")
+}
+
+model ServerAccessLog {
+  id             String    @id @default(cuid())
+  namaOrang      String    @map("nama_orang")
+  instansi       String    @default("") @map("instansi")
+  namaPic        String    @default("") @map("nama_pic")
+  keperluan      String?
+  jenisAkses     String    @default("masuk") @map("jenis_akses") // Tetap ada agar kompatibel
+  waktuAkses     DateTime  @default(now()) @map("waktu_akses")
+  waktuKeluar    DateTime? @map("waktu_keluar")
+  fotoUrl        String?   @map("foto_url")
+  catatanOleh    String    @map("catatan_oleh")
+  statusApproval String    @default("pending") @map("status_approval") // "pending" | "approved" | "rejected"
+  approvedBy     String?   @map("approved_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  pencatat       User      @relation("LogPencatat", fields: [catatanOleh], references: [id])
+  approver       User?     @relation("LogApprover", fields: [approvedBy], references: [id])
+
+  @@map("server_access_logs")
 }
 
 model WorkstationMaster {
