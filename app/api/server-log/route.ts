@@ -125,6 +125,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Nama PIC wajib diisi." }, { status: 400 });
     }
 
+    const dbUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ id: session.sub }, { username: session.username }],
+      },
+    });
+
+    if (!dbUser || !dbUser.isAktif) {
+      return NextResponse.json(
+        { error: "Sesi login Anda telah kedaluwarsa. Silakan login kembali." },
+        { status: 401 }
+      );
+    }
+
     const log = await prisma.serverAccessLog.create({
       data: {
         namaOrang,
@@ -134,7 +147,7 @@ export async function POST(req: Request) {
         jenisAkses: "masuk",
         waktuAkses: new Date(),
         fotoUrl,
-        catatanOleh: session.sub,
+        catatanOleh: dbUser.id,
         statusApproval: "pending",
       },
       include: {

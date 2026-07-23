@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/session";
-import { WorkstationForm } from "@/components/input-tiket/WorkstationForm";
+import { InputTiketLayout } from "@/components/input-tiket/InputTiketLayout";
 import { Monitor } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +20,11 @@ export default async function InputTiketWorkstationPage() {
           <h1 className="page-title">Input Tiket Workstation</h1>
         </div>
         <p className="page-subtitle">
-          Pendataan kerusakan perangkat & barang workstation. Nomor tiket
+          Pendataan kerusakan perangkat &amp; barang workstation. Nomor tiket
           dibuat otomatis. Petugas: <span className="font-medium">{session.nama}</span>
         </p>
       </div>
-      <WorkstationForm />
+      <InputTiketLayout />
     </div>
   );
 }

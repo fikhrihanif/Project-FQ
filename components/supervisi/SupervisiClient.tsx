@@ -55,9 +55,15 @@ export function SupervisiClient({ initialTickets }: Props) {
       const res = await fetch(`/api/tickets/${selectedTicket.id}/approve-workstation`, {
         method: "POST",
       });
-      const data = await res.json();
+      let data: { error?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        // ignore JSON parse error
+      }
+
       if (!res.ok) {
-        setApproveError(data.error ?? "Gagal menyetujui tiket.");
+        setApproveError(data.error ?? `Gagal menyetujui tiket (${res.status}).`);
         return;
       }
       // Simpan nomor tiket untuk pop-up sukses
@@ -70,8 +76,8 @@ export function SupervisiClient({ initialTickets }: Props) {
       // Tutup modal detail
       setSelectedTicket(null);
       setSelectedTicketId(null);
-    } catch {
-      setApproveError("Terjadi kesalahan jaringan.");
+    } catch (err) {
+      setApproveError(err instanceof Error ? err.message : "Terjadi kesalahan koneksi.");
     } finally {
       setApproving(false);
     }
@@ -109,7 +115,11 @@ export function SupervisiClient({ initialTickets }: Props) {
                     <Td className="text-xs">{t.wsTanggalMasuk ? fmtDateTime(t.wsTanggalMasuk) : "—"}</Td>
                     <Td>{t.wsMerekKomputer || "—"}</Td>
                     <Td>
-                      <Badge variant="warning">Menunggu Approval</Badge>
+                      {t.status === "selesai" ? (
+                        <Badge variant="info">Selesai — Menunggu Approval</Badge>
+                      ) : (
+                        <Badge variant="warning">Dalam Proses</Badge>
+                      )}
                     </Td>
                   </TableRow>
                 ))}

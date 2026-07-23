@@ -12,6 +12,6 @@ export async function GET() {
     return NextResponse.json({ error: "Tidak terautentikasi." }, { status: 401 });
   }
 
-  const data = await getDashboardData(session.sub);
+  const data = await getDashboardData();
   return NextResponse.json(data);
 }

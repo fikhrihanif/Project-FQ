@@ -80,5 +80,5 @@ export async function saveImageUpload(
     );
   }
 
-  return { ok: true, url: `/uploads/${kind}/${filename}` };
+  return { ok: true, url: `/api/uploads/${kind}/${filename}` };
 }

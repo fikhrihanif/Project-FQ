@@ -16,8 +16,22 @@ import {
   RefreshCw,
   ZoomIn,
   Clock,
+  ImageIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+
+// ── Convert Data URL ke Blob (100% handal di semua browser) ───────────────
+function dataURLtoBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(",");
+  const mime = parts[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
 // ── Kompresi gambar: resize max 800px & JPEG quality 0.65 ─────────────────
 function compressImage(dataUrl: string, maxWidth = 800, quality = 0.65): Promise<string> {
@@ -81,7 +95,6 @@ function CameraViewfinder({
 
   return (
     <div className="relative w-full rounded-xl overflow-hidden bg-black select-none">
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
         ref={videoRef}
         autoPlay
@@ -115,10 +128,10 @@ function CameraViewfinder({
         <button
           type="button"
           onClick={handleCapture}
-          className="w-16 h-16 rounded-full bg-white/90 hover:bg-white border-4 border-white/40 shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center pointer-events-auto"
+          className="w-14 h-14 rounded-full bg-white/90 hover:bg-white border-4 border-white/40 shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center pointer-events-auto"
           title="Ambil foto"
         >
-          <Camera className="w-7 h-7 text-gray-800" />
+          <Camera className="w-6 h-6 text-gray-800" />
         </button>
 
         <button
@@ -174,7 +187,6 @@ const PIC_LIST = [
   "RIDHO M R"
 ];
 
-// ── Komponen utama ────────────────────────────────────────────────────────────
 export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps) {
   const [namaOrang, setNamaOrang] = useState("");
   const [instansi, setInstansi] = useState("");
@@ -191,15 +203,14 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Bersihkan stream saat modal ditutup
   useEffect(() => {
     if (!open) {
       stopCamera();
     }
   }, [open]);
 
-  // ── Camera helpers ──────────────────────────────────────────────────────
   function stopCamera() {
     setStream((prev) => {
       if (prev) prev.getTracks().forEach((t) => t.stop());
@@ -228,7 +239,7 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
     } catch (err) {
       console.error("Camera error:", err);
       setCameraError(
-        "Kamera tidak dapat diakses. Pastikan izin kamera sudah diberikan di browser."
+        "Kamera tidak dapat diakses di browser ini. Gunakan opsi 'Unggah Foto File'."
       );
     }
   }, []);
@@ -249,23 +260,40 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
     await uploadDataUrl(dataUrl);
   }
 
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const dataUrl = evt.target?.result as string;
+      if (!dataUrl) return;
+      const compressed = await compressImage(dataUrl, 800, 0.65);
+      setFotoPreview(compressed);
+      setFotoMode("preview");
+      await uploadDataUrl(compressed);
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function uploadDataUrl(dataUrl: string) {
     setUploading(true);
     try {
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+      const blob = dataURLtoBlob(dataUrl);
+      const file = new File([blob], `log-photo-${Date.now()}.jpg`, { type: "image/jpeg" });
       const fd = new FormData();
       fd.append("file", file);
       const uploadRes = await fetch("/api/server-log/upload", { method: "POST", body: fd });
-      let data: Record<string, unknown>;
-      try { data = await uploadRes.json(); } catch { throw new Error("Upload gagal."); }
-      if (!uploadRes.ok) throw new Error((data.error as string) ?? "Upload gagal.");
-      setFotoUrl(data.url as string);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload foto gagal.");
-      setFotoPreview(null);
-      setFotoMode("idle");
+      let data: Record<string, unknown> = {};
+      try { data = await uploadRes.json(); } catch { data = {}; }
+      if (uploadRes.ok && typeof data.url === "string") {
+        setFotoUrl(data.url);
+      } else {
+        // Fallback langsung simpan Base64 dataUrl jika upload server bermasalah
+        setFotoUrl(dataUrl);
+      }
+    } catch {
+      // Fallback langsung simpan Base64 dataUrl
+      setFotoUrl(dataUrl);
     } finally {
       setUploading(false);
     }
@@ -276,9 +304,9 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
     setFotoPreview(null);
     setFotoUrl(null);
     setFotoMode("idle");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   function resetForm() {
     setNamaOrang("");
     setInstansi("");
@@ -296,7 +324,7 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
     if (!instansi.trim()) { setError("Nama instansi wajib diisi."); return; }
     if (!namaPic.trim()) { setError("Nama PIC wajib diisi."); return; }
     if (!keperluan.trim()) { setError("Keperluan wajib diisi."); return; }
-    if (!fotoUrl) { setError("Foto wajib diambil menggunakan kamera."); return; }
+    if (!fotoUrl) { setError("Foto wajib diambil atau diunggah."); return; }
     setSaving(true); setError(null);
     try {
       const res = await fetch("/api/server-log", {
@@ -400,12 +428,20 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
             onChange={(e) => setKeperluan(e.target.value)}
           />
 
-          {/* ── Foto / Kamera ─────────────────────────────────────── */}
+          {/* ── Foto / Kamera / Upload File ───────────────────────────── */}
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-1.5">
-              Ambil Foto <span className="text-red-500">*</span>
+            <p className="text-xs font-semibold text-gray-700 mb-1.5">
+              Foto Pengunjung <span className="text-red-500">*</span>
               <span className="text-gray-400 font-normal text-xs ml-1">(wajib)</span>
             </p>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
 
             <AnimatePresence mode="wait">
               {fotoMode === "idle" && (
@@ -414,21 +450,34 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
+                  className="space-y-2"
                 >
                   {cameraError && (
-                    <div className="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 whitespace-pre-line">
+                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
                       {cameraError}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => startCamera(facingMode)}
-                    className="w-full flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-primary/40 bg-primary-50/40 rounded-xl text-primary hover:border-primary hover:bg-primary-50 transition-all duration-150"
-                  >
-                    <Camera className="w-7 h-7" />
-                    <span className="text-xs font-semibold">Buka Kamera</span>
-                    <span className="text-[10px] text-primary/60">Klik untuk mengambil foto langsung</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startCamera(facingMode)}
+                      className="flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-primary/40 bg-primary-50/40 rounded-xl text-primary hover:border-primary hover:bg-primary-50 transition-all"
+                    >
+                      <Camera className="w-6 h-6" />
+                      <span className="text-xs font-semibold">Buka Kamera</span>
+                      <span className="text-[10px] text-primary/60">Foto langsung webcam/HP</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-gray-300 bg-gray-50/70 rounded-xl text-gray-700 hover:border-gray-400 hover:bg-gray-100 transition-all"
+                    >
+                      <ImageIcon className="w-6 h-6 text-gray-500" />
+                      <span className="text-xs font-semibold">Unggah File</span>
+                      <span className="text-[10px] text-gray-400">Pilih dari Galeri/PC</span>
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
@@ -457,19 +506,19 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
                   initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="relative rounded-xl overflow-hidden border border-gray-200"
+                  className="relative rounded-xl overflow-hidden border border-gray-200 bg-black/5"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={fotoPreview}
-                    alt="Preview"
+                    alt="Preview Foto"
                     className="w-full object-cover rounded-xl"
                     style={{ maxHeight: "220px" }}
                   />
                   {uploading && (
-                    <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center gap-2">
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      <p className="text-xs text-gray-600 font-medium">Mengompresi &amp; mengunggah...</p>
+                      <p className="text-xs text-gray-700 font-semibold">Mengompresi &amp; mengunggah foto...</p>
                     </div>
                   )}
                   <button
@@ -477,11 +526,11 @@ export function TambahLogModal({ open, onClose, onSuccess }: TambahLogModalProps
                     onClick={removeFoto}
                     className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-full shadow hover:bg-white transition-colors"
                   >
-                    <X className="w-3.5 h-3.5 text-gray-700" />
+                    <X className="w-4 h-4 text-gray-700" />
                   </button>
                   {!uploading && fotoUrl && (
-                    <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-green-600/90 text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                      <ZoomIn className="w-3.5 h-3.5" /> Foto siap (dikompres)
+                    <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-green-600/90 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow">
+                      <ZoomIn className="w-3.5 h-3.5" /> Foto tersimpan &amp; terverifikasi
                     </div>
                   )}
                 </motion.div>

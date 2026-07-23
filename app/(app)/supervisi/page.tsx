@@ -11,9 +11,9 @@ export default async function SupervisiPage() {
     redirect("/dashboard");
   }
 
-  // Supervisi melihat tiket workstation yang berstatus proses dan belum diapprove.
+  // Supervisi melihat SEMUA tiket workstation yang belum diapprove,
+  // termasuk yang sudah selesai dikerjakan teknisi namun menunggu approval.
   const tickets = await listTickets({
-    status: "proses",
     statusSupervisi: "belum",
   });
 

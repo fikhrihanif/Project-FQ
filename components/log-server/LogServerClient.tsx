@@ -28,7 +28,6 @@ interface LogServerClientProps {
 export function LogServerClient({
   currentUserNama,
   currentUserRole,
-  currentUserId: _currentUserId,
 }: LogServerClientProps) {
   const [filter, setFilter] = useState<FilterType>("harian");
   const [logs, setLogs] = useState<ServerLog[]>([]);

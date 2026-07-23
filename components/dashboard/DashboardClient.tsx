@@ -10,6 +10,7 @@ import { MetricCards } from "./MetricCards";
 import { MiniCalendar } from "./MiniCalendar";
 import { DayTicketList } from "./DayTicketList";
 import { AlertDock } from "./AlertDock";
+import { ChartsRow } from "./ChartsRow";
 
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -56,7 +57,7 @@ export function DashboardClient({ initialData }: Props) {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Toolbar refresh */}
       <div className="flex items-center justify-end gap-3 text-sm">
         <span className="text-gray-400">
@@ -73,8 +74,17 @@ export function DashboardClient({ initialData }: Props) {
         </Button>
       </div>
 
+      {/* KPI Metric Cards */}
       <MetricCards counts={data.counts} />
 
+      {/* Analytics Charts */}
+      <ChartsRow
+        branchStats={data.branchStats}
+        brandStats={data.brandStats}
+        dailyTrend={data.dailyTrend}
+      />
+
+      {/* Kalender & Tiket Harian */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Card padding="lg">
           <CardTitle className="mb-4">Kalender Tiket Berjalan</CardTitle>
@@ -90,6 +100,7 @@ export function DashboardClient({ initialData }: Props) {
         </Card>
       </div>
 
+      {/* Alert Open Tickets */}
       <AlertDock openTickets={data.openTickets} />
     </div>
   );

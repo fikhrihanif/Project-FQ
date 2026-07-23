@@ -53,6 +53,20 @@ export async function POST(req: Request) {
     );
   }
 
+  // Verifikasi user valid di database (mencegah Foreign Key constraint error jika cookie lama)
+  const dbUser = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: session.sub }, { username: session.username }],
+    },
+  });
+
+  if (!dbUser || !dbUser.isAktif) {
+    return NextResponse.json(
+      { error: "Sesi login Anda telah kedaluwarsa. Silakan login kembali." },
+      { status: 401 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
 
   const wsCabang = cleanStr(body?.wsCabang);
@@ -104,7 +118,7 @@ export async function POST(req: Request) {
         cpTelp: cpTipe === "pic" ? cpTelp : null,
         status: "proses",
         statusSupervisi: "belum",
-        ownerUserId: session.sub,
+        ownerUserId: dbUser.id,
         keterangan: optStr(body?.keterangan),
       },
     });
@@ -112,7 +126,7 @@ export async function POST(req: Request) {
     await tx.ticketActivity.create({
       data: {
         ticketId: t.id,
-        userId: session.sub,
+        userId: dbUser.id,
         teks: kegiatan,
       },
     });
