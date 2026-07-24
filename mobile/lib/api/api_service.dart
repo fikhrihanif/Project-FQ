@@ -399,4 +399,27 @@ class ApiService {
       return {};
     }
   }
+
+  /// Ekstrak teks dari foto menggunakan AI OCR Server
+  Future<String?> performServerOcr(String base64Image, String targetField) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ocr'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'image': base64Image,
+          'targetField': targetField,
+        }),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['text'] != null) {
+          return data['text'] as String;
+        }
+      }
+    } catch (e) {
+      print('Server OCR error: $e');
+    }
+    return null;
+  }
 }
