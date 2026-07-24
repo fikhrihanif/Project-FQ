@@ -93,7 +93,7 @@ export async function buildWorkstationWorkbook(
   ws.getRow(3).height = 18;
   ws.getRow(4).height = 18;
 
-  const realLogoPath = logoPath ?? join(process.cwd(), "public", "logo-bank-nagari.png");
+  const realLogoPath = logoPath ?? join(process.cwd(), "public", "logo-fq.png");
   if (existsSync(realLogoPath)) {
     const logoImg = wb.addImage({
       buffer: readFileSync(realLogoPath) as unknown as ArrayBuffer,

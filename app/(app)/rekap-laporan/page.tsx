@@ -10,10 +10,9 @@ export default async function RekapLaporanPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="page-title">Rekap Laporan</h1>
+        <h1 className="page-title">Laporan</h1>
         <p className="page-subtitle">
-          Unduh rekap laporan penanganan gangguan workstation Bank Nagari dalam format Excel.
-          Visual Excel otomatis mengikuti standar Bank Nagari (warna biru, border tipis, dan logo Bank Nagari).
+          Pilihan laporan rekap workstation (format Excel) dan Berita Acara Serah Terima Perangkat resmi (format Word & PDF).
         </p>
       </div>
       <RekapLaporanClient today={fmtDateKey(new Date())} />

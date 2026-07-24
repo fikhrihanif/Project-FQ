@@ -63,10 +63,10 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["user"],
   },
   {
-    label: "Rekap Laporan",
+    label: "Laporan",
     href: "/rekap-laporan",
     icon: FileBarChart2,
-    description: "Download rekap laporan workstation",
+    description: "Cetak Rekap Workstation (Excel) & Berita Acara (Word)",
   },
   {
     label: "Master Cabang",
@@ -97,6 +97,6 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export const APP_NAME = "Nagari Workstation Monitor";
+export const APP_NAME = "Fast Queue System";
 export const APP_SUBTITLE = "Sistem Pemantauan Gangguan Workstation";
-export const BANK_NAME = "Bank Nagari";
+export const BANK_NAME = "Fast Queue";

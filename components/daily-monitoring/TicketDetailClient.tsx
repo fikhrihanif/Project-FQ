@@ -11,6 +11,7 @@ import {
   Monitor,
   Send,
   AlertTriangle,
+  FileText,
 } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -239,6 +240,14 @@ export function TicketDetailClient({
           <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="w-4 h-4" /> Ubah Detail
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`/api/reports/berita-acara?ticketId=${ticket.id}&format=print`, '_blank')}
+              className="border-blue-600 text-blue-700 hover:bg-blue-50"
+            >
+              <FileText className="w-4 h-4 text-blue-600" /> Berita Acara (Word / PDF)
             </Button>
             {!isSelesai && (
               <Button

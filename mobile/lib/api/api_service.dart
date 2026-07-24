@@ -2,9 +2,31 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-// ─── BASE URL ────────────────────────────────────────────────────────────────
-// Terhubung ke Docker / Dev Server Laptop via Wi-Fi (IP terbaru: 10.73.214.31):
-const String baseUrl = 'http://10.73.214.31:3000/api';
+// ─── BASE URL DINAMIS ────────────────────────────────────────────────────────
+// Default Hotspot Windows IP: 192.168.137.1 (Bisa diubah secara langsung via menu di HP)
+String _currentBaseUrl = 'http://192.168.137.1:3000/api';
+
+String get baseUrl => _currentBaseUrl;
+
+Future<void> setCustomServerIp(String ipOrHost) async {
+  var clean = ipOrHost.trim().replaceAll('http://', '').replaceAll('https://', '').replaceAll('/api', '').replaceAll('/', '');
+  if (!clean.contains(':')) {
+    clean = '$clean:3000';
+  }
+  _currentBaseUrl = 'http://$clean/api';
+  try {
+    await const FlutterSecureStorage().write(key: 'custom_server_url', value: _currentBaseUrl);
+  } catch (_) {}
+}
+
+Future<void> loadSavedBaseUrl() async {
+  try {
+    final saved = await const FlutterSecureStorage().read(key: 'custom_server_url');
+    if (saved != null && saved.isNotEmpty) {
+      _currentBaseUrl = saved;
+    }
+  } catch (_) {}
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -74,6 +96,7 @@ class ApiService {
         await _saveCookieFromResponse(response);
         if (data['user'] != null) {
           await _storage.write(key: 'user_cache', value: jsonEncode(data['user']));
+          await updateLastActive();
         }
         return {'success': true, 'user': data['user']};
       } else {
@@ -91,15 +114,53 @@ class ApiService {
     } catch (_) {}
     await _clearCookie();
     await _storage.delete(key: 'user_cache');
+    await _storage.delete(key: 'last_active');
+  }
+
+  /// Update timestamp aktivitas terakhir
+  Future<void> updateLastActive() async {
+    try {
+      await _storage.write(key: 'last_active', value: DateTime.now().millisecondsSinceEpoch.toString());
+    } catch (_) {}
+  }
+
+  /// Cek & restore session jika masih dalam rentang waktu aktif (30 menit inactivity timeout)
+  Future<Map<String, dynamic>?> checkOrRestoreSession() async {
+    try {
+      final me = await getMe().timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
+      if (me != null && me['user'] != null) {
+        await _storage.write(key: 'user_cache', value: jsonEncode(me['user']));
+        await updateLastActive();
+        return me['user'] as Map<String, dynamic>;
+      }
+
+      final cachedUser = await _storage.read(key: 'user_cache');
+      final lastActiveStr = await _storage.read(key: 'last_active');
+
+      if (cachedUser != null && lastActiveStr != null) {
+        final lastActive = int.tryParse(lastActiveStr) ?? 0;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        // Inactivity timeout: 30 menit
+        const timeoutMs = 30 * 60 * 1000;
+
+        if (now - lastActive < timeoutMs) {
+          await updateLastActive();
+          return jsonDecode(cachedUser) as Map<String, dynamic>;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Verifikasi session masih valid → GET /api/me
   Future<Map<String, dynamic>?> getMe() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/me'), headers: await _headers());
+      final response = await http
+          .get(Uri.parse('$baseUrl/me'), headers: await _headers())
+          .timeout(const Duration(seconds: 3));
       if (response.statusCode == 200) {
-        // Perbarui cookie jika server memperbaruinya
         await _saveCookieFromResponse(response);
+        await updateLastActive();
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
       return null;

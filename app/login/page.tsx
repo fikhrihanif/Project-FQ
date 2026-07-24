@@ -74,12 +74,12 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-card-lg overflow-hidden">
           {/* Header */}
           <div className="bg-primary px-8 pt-8 pb-6 text-center">
-            <AppLogo logoUrl={logoUrl} className="w-40 h-12 mx-auto mb-3" priority />
+            <AppLogo logoUrl={logoUrl} className="w-44 h-14 mx-auto mb-3" priority />
             <h1 className="text-white text-lg font-display font-bold">
-              mtr-Report
+              Fast Queue System
             </h1>
             <p className="text-primary-200 text-xs mt-0.5">
-              Monitoring &amp; Tiket Gangguan ATM &amp; Jaringan
+              Sistem Pemantauan Gangguan Workstation
             </p>
           </div>
 

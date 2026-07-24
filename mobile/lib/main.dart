@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:camera/camera.dart';
 import 'api/api_service.dart';
 import 'custom_code/widgets/ocr_camera_scanner_widget.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await loadSavedBaseUrl();
   runApp(const NagariApp());
 }
 
@@ -17,7 +22,7 @@ class NagariApp extends StatelessWidget {
     const accentColor = Color(0xFF0D9BD2);
 
     return MaterialApp(
-      title: 'MTR-Report Mobile — Bank Nagari',
+      title: 'Fast Queue System Mobile',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -123,21 +128,33 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkSession() async {
+    Map<String, dynamic>? user;
     try {
-      await Future.delayed(const Duration(milliseconds: 1800));
-      try {
-        await _api.logout();
-      } catch (_) {}
+      final results = await Future.wait([
+        Future.delayed(const Duration(milliseconds: 1200)),
+        _api.checkOrRestoreSession().timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+      ]);
+      user = results[1] as Map<String, dynamic>?;
     } catch (_) {}
 
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, a, __) => FadeTransition(opacity: a, child: const LoginScreen()),
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
-    );
+    if (user != null) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, a, __) => FadeTransition(opacity: a, child: MainScreen(user: user!)),
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, a, __) => FadeTransition(opacity: a, child: const LoginScreen()),
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
+      );
+    }
   }
 
   @override
@@ -186,6 +203,7 @@ class _SplashScreenState extends State<SplashScreen>
                         children: [
                           Container(
                             width: 100, height: 100,
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(28),
@@ -197,21 +215,11 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: Text(
-                                'BN',
-                                style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF00569E),
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                            ),
+                            child: Image.asset('assets/images/logo-fq.png', fit: BoxFit.contain),
                           ),
                           const SizedBox(height: 24),
                           const Text(
-                            'MTR-Report',
+                            'Fast Queue',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 28,
@@ -221,7 +229,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Bank Nagari IT Support System',
+                            'Workstation Monitoring System',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 14,
@@ -293,6 +301,88 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showServerConfigDialog() {
+    final ipCtrl = TextEditingController(
+      text: baseUrl.replaceAll('http://', '').replaceAll('/api', ''),
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_tethering_rounded, color: Color(0xFF00569E)),
+            SizedBox(width: 8),
+            Text('Pengaturan IP Server', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Masukkan IP Laptop / Mobile Hotspot tempat aplikasi Web Docker berjalan:',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ipCtrl,
+              decoration: InputDecoration(
+                labelText: 'Host IP & Port',
+                hintText: '192.168.137.1:3000',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.dns_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Pilihan Cepat:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.cell_wifi_rounded, size: 14),
+                  label: const Text('Hotspot Laptop (192.168.137.1)', style: TextStyle(fontSize: 11)),
+                  onPressed: () {
+                    ipCtrl.text = '192.168.137.1:3000';
+                  },
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.computer_rounded, size: 14),
+                  label: const Text('Localhost (10.0.2.2:3000)', style: TextStyle(fontSize: 11)),
+                  onPressed: () {
+                    ipCtrl.text = '10.0.2.2:3000';
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00569E), foregroundColor: Colors.white),
+            onPressed: () async {
+              if (ipCtrl.text.trim().isNotEmpty) {
+                await setCustomServerIp(ipCtrl.text.trim());
+                if (!mounted) return;
+                setState(() {});
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('IP Server diperbarui ke: $baseUrl'), backgroundColor: Colors.green),
+                  );
+                }
+              }
+            },
+            child: const Text('Simpan IP'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -313,6 +403,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Container(
                     width: 88, height: 88,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -324,21 +415,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Text(
-                        'BN',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF00569E),
-                          letterSpacing: -1,
-                        ),
-                      ),
-                    ),
+                    child: Image.asset('assets/images/logo-fq.png', fit: BoxFit.contain),
                   ),
                   const SizedBox(height: 18),
                   const Text(
-                    'MTR-Report Mobile',
+                    'Fast Queue Mobile',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -348,7 +429,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Bank Nagari IT Support System',
+                    'Workstation Monitoring System',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.75),
                       fontSize: 13,
@@ -453,12 +534,41 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        InkWell(
+                          onTap: _showServerConfigDialog,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.wifi_tethering_rounded, size: 16, color: Color(0xFF00569E)),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'IP Server: ${baseUrl.replaceAll('http://', '').replaceAll('/api', '')}',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00569E)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.edit_rounded, size: 14, color: Color(0xFF00569E)),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Bank Pembangunan Daerah Sumatera Barat',
+                    'Fast Queue Workstation System',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 11,
@@ -485,8 +595,10 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  int _idx = 0;
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+  // DEFAULT INDEX = 2 (DASHBOARD DI TENGAH MENGAMBANG SEBAGAI DEFAULT SAAT APPS DIBUKA)
+  int _idx = 2;
+  late final PageController _pageController;
 
   late final List<Widget> _pages;
   late final String _role;
@@ -495,15 +607,32 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ApiService().updateLastActive();
+    _pageController = PageController(initialPage: 2);
     _role = widget.user['role'] as String? ?? 'user';
     _nama = widget.user['nama'] as String? ?? '';
     _pages = [
-      DashboardPage(nama: _nama, role: _role),
-      const InputTiketPage(),
-      const LogServerPage(),
-      const MonitoringPage(),
-      if (_role == 'supervisi' || _role == 'superadmin') const SupervisiPage(),
+      const MonitoringPage(),                             // Index 0: Monitoring
+      const InputTiketPage(),                            // Index 1: Input Tiket
+      DashboardPage(nama: _nama, role: _role),               // Index 2: Dashboard (Center Default)
+      const LogServerPage(),                             // Index 3: Log Server
+      AkunPage(user: widget.user, onLogout: _logout),       // Index 4: Akun
     ];
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ApiService().updateLastActive();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _logout() async {
@@ -516,63 +645,99 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  void _onTabTapped(int index) {
+    setState(() => _idx = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final navItems = [
-      _NavItem(icon: Icons.dashboard_rounded, activeIcon: Icons.dashboard, label: 'Dashboard'),
-      _NavItem(icon: Icons.add_to_photos_outlined, activeIcon: Icons.add_to_photos_rounded, label: 'Input Tiket'),
-      _NavItem(icon: Icons.meeting_room_outlined, activeIcon: Icons.meeting_room_rounded, label: 'Log Server'),
       _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long_rounded, label: 'Monitoring'),
-      if (_role == 'supervisi' || _role == 'superadmin')
-        _NavItem(icon: Icons.verified_user_outlined, activeIcon: Icons.verified_user_rounded, label: 'Supervisi'),
+      _NavItem(icon: Icons.add_circle_outline_rounded, activeIcon: Icons.add_circle_rounded, label: 'Input Tiket'),
+      _NavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Dashboard', isCenter: true),
+      _NavItem(icon: Icons.door_sliding_outlined, activeIcon: Icons.door_sliding_rounded, label: 'Log Server'),
+      _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Akun'),
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _idx, children: _pages),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (i) => setState(() => _idx = i),
+        physics: const BouncingScrollPhysics(),
+        children: _pages,
+      ),
       bottomNavigationBar: Container(
+        height: 72,
         decoration: const BoxDecoration(
           color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
-            BoxShadow(color: Color(0x1A00569E), blurRadius: 20, offset: Offset(0, -4)),
+            BoxShadow(color: Color(0x1F00569E), blurRadius: 20, offset: Offset(0, -4)),
           ],
         ),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         child: SafeArea(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(navItems.length, (i) {
               final isSelected = _idx == i;
               final item = navItems[i];
-              return InkWell(
-                onTap: () => setState(() => _idx = i),
-                borderRadius: BorderRadius.circular(16),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF00569E).withValues(alpha: 0.12) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSelected ? item.activeIcon : item.icon,
-                        color: isSelected ? const Color(0xFF00569E) : const Color(0xFF94A3B8),
-                        size: 22,
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          item.label,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF00569E),
+              final isCenter = item.isCenter;
+
+              return Expanded(
+                child: InkWell(
+                  onTap: () => _onTabTapped(i),
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutBack,
+                    transform: Matrix4.translationValues(0, isSelected ? (isCenter ? -12 : -8) : 0, 0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isCenter ? 10 : 7),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFF00569E)
+                                : (isCenter ? const Color(0xFFEFF6FF) : Colors.transparent),
+                            shape: BoxShape.circle,
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF00569E).withValues(alpha: 0.35),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            color: isSelected
+                                ? Colors.white
+                                : (isCenter ? const Color(0xFF00569E) : const Color(0xFF94A3B8)),
+                            size: isCenter ? 24 : 22,
                           ),
                         ),
+                        const SizedBox(height: 2),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            fontSize: isSelected ? 11 : 10,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? const Color(0xFF00569E) : const Color(0xFF94A3B8),
+                          ),
+                          child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               );
@@ -588,7 +753,199 @@ class _NavItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
-  _NavItem({required this.icon, required this.activeIcon, required this.label});
+  final bool isCenter;
+  _NavItem({required this.icon, required this.activeIcon, required this.label, this.isCenter = false});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AKUN PAGE — Tab Ke-5 untuk Profil, IP Server Config, dan Logout
+// ─────────────────────────────────────────────────────────────────────────────
+
+class AkunPage extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final VoidCallback onLogout;
+
+  const AkunPage({super.key, required this.user, required this.onLogout});
+
+  void _showServerConfigDialogInAkun(BuildContext context) {
+    final ctrl = TextEditingController(text: baseUrl.replaceAll('http://', '').replaceAll('/api', ''));
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_tethering_rounded, color: Color(0xFF00569E)),
+            SizedBox(width: 8),
+            Text('Pengaturan IP Server', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Masukkan IP Komputer / Server tempat Next.js & Docker berjalan (mis. 192.168.43.150:3000 atau localhost:3000):',
+              style: TextStyle(fontSize: 12, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                labelText: 'IP & Port Server',
+                hintText: '192.168.43.150:3000',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.dns_rounded),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00569E), foregroundColor: Colors.white),
+            onPressed: () async {
+              final newIp = ctrl.text.trim();
+              if (newIp.isNotEmpty) {
+                await setCustomServerIp(newIp);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('IP Server berhasil diperbarui: $baseUrl'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Simpan IP'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nama = user['nama'] as String? ?? 'User';
+    final username = user['username'] as String? ?? '';
+    final role = user['role'] as String? ?? 'user';
+    final roleLabel = role == 'superadmin' ? 'Super Admin' : (role == 'supervisi' ? 'Supervisi' : 'IT Support Staff');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profil & Akun Saya', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: const Color(0xFF00569E),
+                    child: Text(
+                      nama.isNotEmpty ? nama[0].toUpperCase() : 'U',
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(nama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1E293B))),
+                        const SizedBox(height: 2),
+                        Text('@$username', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                          ),
+                          child: Text(
+                            roleLabel,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF00569E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('PENGATURAN KONEKSI & AKUN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey, letterSpacing: 0.5)),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.wifi_tethering_rounded, color: Color(0xFF00569E))),
+              title: const Text('Pengaturan IP Server Host', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text('IP Server: ${baseUrl.replaceAll('http://', '').replaceAll('/api', '')}', style: const TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _showServerConfigDialogInAkun(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: const ListTile(
+              leading: CircleAvatar(backgroundColor: Color(0xFFF1F5F9), child: Icon(Icons.info_outline_rounded, color: Color(0xFF475569))),
+              title: Text('Versi Aplikasi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text('Fast Queue Mobile v1.0 • Workstation System', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade50,
+                foregroundColor: Colors.red.shade700,
+                elevation: 0,
+                side: BorderSide(color: Colors.red.shade200),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Konfirmasi Keluar', style: TextStyle(fontWeight: FontWeight.bold)),
+                    content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600, foregroundColor: Colors.white),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          onLogout();
+                        },
+                        child: const Text('Ya, Keluar'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Keluar dari Akun', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -629,24 +986,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetch),
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'logout') {
-                final state = context.findAncestorStateOfType<_MainScreenState>();
-                state?._logout();
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(children: [Icon(Icons.logout, size: 16), SizedBox(width: 8), Text('Logout')]),
-              ),
-            ],
-          ),
-        ],
+        title: const Text('Dashboard Visualisasi', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -728,7 +1068,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Text(
-                                  '📊 Nagari Workstation Monitoring System',
+                                  '📊 Fast Queue Workstation Monitoring System',
                                   style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -757,6 +1097,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     final avgDur = _data['avgDurationDays'] ?? 0;
                     final branchList = (_data['branchStats'] as List?) ?? [];
                     final brandList = (_data['brandStats'] as List?) ?? [];
+                    final dailyList = (_data['dailyTrend'] as List?) ?? [];
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,7 +1190,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Visual Breakdown Cabang Paling Sering Rusak
+                        // ── 1. LINE CHART: Tren Tiket Harian (30 Hari) ──
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -864,7 +1205,54 @@ class _DashboardPageState extends State<DashboardPage> {
                             children: [
                               const Row(
                                 children: [
-                                  Icon(Icons.business_rounded, size: 18, color: Color(0xFF00569E)),
+                                  Icon(Icons.show_chart_rounded, size: 18, color: Color(0xFF00569E)),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Tren Tiket Harian (30 Hari Terakhir)',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              if (dailyList.isEmpty)
+                                const SizedBox(height: 100, child: Center(child: Text('Belum ada tren data.', style: TextStyle(color: Colors.grey))))
+                              else
+                                SizedBox(
+                                  height: 120,
+                                  width: double.infinity,
+                                  child: CustomPaint(
+                                    painter: _LineChartPainter(dailyList),
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('30 Hari Lalu', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  Text('Hari Ini', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF00569E))),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ── 2. DONUT / PIE CHART: Cabang Paling Sering Rusak ──
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 2)),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.pie_chart_outline_rounded, size: 18, color: Color(0xFF059669)),
                                   SizedBox(width: 8),
                                   Text(
                                     'Cabang Paling Sering Rusak',
@@ -875,43 +1263,50 @@ class _DashboardPageState extends State<DashboardPage> {
                               const SizedBox(height: 14),
                               if (branchList.isEmpty)
                                 const Text('Belum ada data cabang.', style: TextStyle(fontSize: 12, color: Colors.grey))
-                              else
-                                ...branchList.take(5).map((b) {
-                                  final name = b['name'] ?? '-';
-                                  final count = b['count'] ?? 0;
-                                  final pct = (b['percentage'] ?? 0).toDouble();
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                            Text('$count Tiket (${pct.toStringAsFixed(1)}%)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(4),
-                                          child: LinearProgressIndicator(
-                                            value: pct / 100,
-                                            minHeight: 6,
-                                            backgroundColor: const Color(0xFFF1F5F9),
-                                            color: const Color(0xFF00569E),
-                                          ),
-                                        ),
-                                      ],
+                              else ...[
+                                Row(
+                                  children: [
+                                    // Visual Donut Painter
+                                    SizedBox(
+                                      width: 90,
+                                      height: 90,
+                                      child: CustomPaint(
+                                        painter: _DonutChartPainter(branchList),
+                                      ),
                                     ),
-                                  );
-                                }),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        children: branchList.take(4).toList().asMap().entries.map((entry) {
+                                          final idx = entry.key;
+                                          final b = entry.value;
+                                          final name = (b['cabang'] ?? b['name'] ?? '-').toString();
+                                          final count = (b['count'] as num?)?.toInt() ?? 0;
+                                          final color = _DonutChartPainter.chartColors[idx % _DonutChartPainter.chartColors.length];
+
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 6),
+                                            child: Row(
+                                              children: [
+                                                Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                                                const SizedBox(width: 6),
+                                                Expanded(child: Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                                                Text('$count Tiket', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
                         const SizedBox(height: 16),
 
-                        // Visual Breakdown Merek Komputer Bermasalah
+                        // ── 3. BAR CHART: Perbandingan Merek Komputer & EDC ──
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -929,7 +1324,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Icon(Icons.devices_rounded, size: 18, color: Color(0xFFD97706)),
                                   SizedBox(width: 8),
                                   Text(
-                                    'Merek Komputer Bermasalah',
+                                    'Perbandingan Merek Komputer & EDC',
                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
                                   ),
                                 ],
@@ -938,10 +1333,14 @@ class _DashboardPageState extends State<DashboardPage> {
                               if (brandList.isEmpty)
                                 const Text('Belum ada data merek.', style: TextStyle(fontSize: 12, color: Colors.grey))
                               else
-                                ...brandList.take(5).map((b) {
-                                  final brand = b['brand'] ?? '-';
-                                  final count = b['count'] ?? 0;
-                                  final pct = (b['percentage'] ?? 0).toDouble();
+                                ...brandList.take(8).map((b) {
+                                  final brand = (b['merek'] ?? b['brand'] ?? '-').toString();
+                                  final count = (b['count'] as num?)?.toInt() ?? 0;
+                                  final isEdc = brand.contains('EDC');
+                                  final maxCount = (brandList.first['count'] as num?)?.toDouble() ?? 1.0;
+                                  final barValue = maxCount > 0 ? (count / maxCount) : 0.0;
+                                  final barColor = isEdc ? const Color(0xFFD97706) : const Color(0xFF00569E);
+
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 10),
                                     child: Column(
@@ -950,18 +1349,24 @@ class _DashboardPageState extends State<DashboardPage> {
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(brand, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                            Text('$count Perangkat (${pct.toStringAsFixed(1)}%)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                            Row(
+                                              children: [
+                                                Icon(isEdc ? Icons.credit_card_rounded : Icons.desktop_windows_rounded, size: 14, color: barColor),
+                                                const SizedBox(width: 6),
+                                                Text(brand, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isEdc ? const Color(0xFFD97706) : const Color(0xFF1E293B))),
+                                              ],
+                                            ),
+                                            Text('$count Tiket', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey)),
                                           ],
                                         ),
                                         const SizedBox(height: 4),
                                         ClipRRect(
                                           borderRadius: BorderRadius.circular(4),
                                           child: LinearProgressIndicator(
-                                            value: pct / 100,
-                                            minHeight: 6,
+                                            value: barValue,
+                                            minHeight: 8,
                                             backgroundColor: const Color(0xFFF1F5F9),
-                                            color: const Color(0xFFD97706),
+                                            color: barColor,
                                           ),
                                         ),
                                       ],
@@ -1612,52 +2017,71 @@ class _LogServerPageState extends State<LogServerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Log Server Room'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchLogs),
-          IconButton(
-            icon: Icon(_showForm ? Icons.close : Icons.add),
-            onPressed: () => setState(() => _showForm = !_showForm),
-            tooltip: _showForm ? 'Tutup Form' : 'Tambah Log',
-          ),
-        ],
+        title: const Text('Log Server Room', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (_showForm) ...[
-            TambahLogForm(
-              onSuccess: (log) {
-                setState(() {
-                  _logs.insert(0, log);
-                  _showForm = false;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Log akses berhasil ditambahkan!'), backgroundColor: Colors.green),
-                );
-              },
-              onCancel: () => setState(() => _showForm = false),
-            ),
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => setState(() => _showForm = !_showForm),
+        backgroundColor: const Color(0xFF00569E),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: Icon(_showForm ? Icons.close_rounded : Icons.add_rounded),
+        label: Text(_showForm ? 'Tutup Form' : 'Tambah Log Server', style: const TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchLogs,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            if (_showForm) ...[
+              TambahLogForm(
+                onSuccess: (log) {
+                  setState(() {
+                    _logs.insert(0, log);
+                    _showForm = false;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Log akses berhasil ditambahkan!'), backgroundColor: Colors.green),
+                  );
+                },
+                onCancel: () => setState(() => _showForm = false),
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+            ],
+
+            const Text('Riwayat Akses Hari Ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 12),
+
+            if (_loading)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+            else if (_logs.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('Belum ada log akses hari ini.', style: TextStyle(color: Colors.grey))))
+            else
+              ..._logs.map((log) => _logCard(log)),
+            const SizedBox(height: 70), // Spacing agar tidak tertutup FAB
           ],
-
-          const Text('Riwayat Akses Hari Ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 12),
-
-          if (_loading)
-            const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
-          else if (_logs.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('Belum ada log akses hari ini.', style: TextStyle(color: Colors.grey))))
-          else
-            ..._logs.map((log) => _logCard(log)),
-        ],
+        ),
       ),
     );
   }
 
+  Uint8List? _safeBase64(String raw) {
+    try {
+      final target = raw.contains('base64,') ? raw.split('base64,').last : raw.split(',').last;
+      final clean = target.replaceAll(RegExp(r'\s+'), '').trim();
+      return base64Decode(clean);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _showFotoDialog(String url, String nama) {
+    final isBase64 = url.startsWith('data:image');
+    final isSvg = url.startsWith('data:image/svg') || url.contains('svg+xml');
+    final bytes = isBase64 ? _safeBase64(url) : null;
+
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -1672,16 +2096,46 @@ class _LogServerPageState extends State<LogServerPage> {
             ),
             Container(
               constraints: const BoxConstraints(maxHeight: 400),
-              child: url.startsWith('data:image')
-                  ? Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain)
-                  : Image.network(
-                      url.startsWith('/') ? '${baseUrl.replaceAll('/api', '')}$url' : url,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Gagal memuat gambar.', style: TextStyle(color: Colors.grey)),
-                      ),
-                    ),
+              padding: const EdgeInsets.all(16),
+              child: isSvg
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: const BoxDecoration(color: Color(0xFFEFF6FF), shape: BoxShape.circle),
+                          child: const Icon(Icons.person_rounded, size: 48, color: Color(0xFF00569E)),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Foto Pengunjung Terekam', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                        const SizedBox(height: 4),
+                        Text(nama, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    )
+                  : (isBase64
+                      ? (bytes != null
+                          ? Image.memory(bytes, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Text('Format foto tidak didukung.', style: TextStyle(color: Colors.grey)))
+                          : const Padding(padding: EdgeInsets.all(32), child: Text('Format foto tidak valid.', style: TextStyle(color: Colors.grey))))
+                      : Image.network(
+                          url.startsWith('/') ? '${baseUrl.replaceAll(RegExp(r'/api/?$'), '')}$url' : url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 80,
+                                height: 80,
+                                decoration: const BoxDecoration(color: Color(0xFFEFF6FF), shape: BoxShape.circle),
+                                child: const Icon(Icons.person_rounded, size: 48, color: Color(0xFF00569E)),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('Bukti Foto Pengunjung Terekam', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                              const SizedBox(height: 4),
+                              Text(nama, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
+                        )),
             ),
           ],
         ),
@@ -1692,6 +2146,9 @@ class _LogServerPageState extends State<LogServerPage> {
   Widget _logCard(Map<String, dynamic> log) {
     final isExited = log['waktuKeluar'] != null;
     final fotoUrl = log['fotoUrl'] as String?;
+    final isBase64 = fotoUrl != null && fotoUrl.startsWith('data:image');
+    final isSvg = fotoUrl != null && (fotoUrl.startsWith('data:image/svg') || fotoUrl.contains('svg+xml'));
+    final bytes = isBase64 && !isSvg ? _safeBase64(fotoUrl) : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1728,7 +2185,7 @@ class _LogServerPageState extends State<LogServerPage> {
               const SizedBox(height: 10),
               InkWell(
                 onTap: () {
-                  final fullUrl = fotoUrl.startsWith('/') ? '${baseUrl.replaceAll('/api', '')}$fotoUrl' : fotoUrl;
+                  final fullUrl = fotoUrl.startsWith('/') ? '${baseUrl.replaceAll(RegExp(r'/api/?$'), '')}$fotoUrl' : fotoUrl;
                   _showFotoDialog(fullUrl, log['namaOrang'] ?? '');
                 },
                 borderRadius: BorderRadius.circular(10),
@@ -1743,20 +2200,30 @@ class _LogServerPageState extends State<LogServerPage> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: fotoUrl.startsWith('data:image')
-                            ? Image.memory(
-                                base64Decode(fotoUrl.split(',').last),
+                        child: isSvg
+                            ? Container(
                                 width: 44,
                                 height: 44,
-                                fit: BoxFit.cover,
+                                color: const Color(0xFFDBEAFE),
+                                child: const Icon(Icons.person_rounded, size: 24, color: Color(0xFF00569E)),
                               )
-                            : Image.network(
-                                fotoUrl.startsWith('/') ? '${baseUrl.replaceAll('/api', '')}$fotoUrl' : fotoUrl,
-                                width: 44,
-                                height: 44,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 24, color: Colors.grey),
-                              ),
+                            : (isBase64
+                                ? (bytes != null
+                                    ? Image.memory(
+                                        bytes,
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 24, color: Colors.blue),
+                                      )
+                                    : const Icon(Icons.person_rounded, size: 24, color: Colors.blue))
+                                : Image.network(
+                                    fotoUrl.startsWith('/') ? '${baseUrl.replaceAll(RegExp(r'/api/?$'), '')}$fotoUrl' : fotoUrl,
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 24, color: Colors.grey),
+                                  )),
                       ),
                       const SizedBox(width: 10),
                       const Expanded(
@@ -1796,6 +2263,203 @@ class _LogServerPageState extends State<LogServerPage> {
   }
 }
 
+class CameraCaptureDialog extends StatefulWidget {
+  final Function(String base64Photo) onCaptured;
+  const CameraCaptureDialog({super.key, required this.onCaptured});
+
+  @override
+  State<CameraCaptureDialog> createState() => _CameraCaptureDialogState();
+}
+
+class _CameraCaptureDialogState extends State<CameraCaptureDialog> {
+  CameraController? _controller;
+  List<CameraDescription> _cameras = [];
+  int _selectedCameraIndex = 0;
+  bool _initializing = true;
+  bool _capturing = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initCamera();
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _error = "Kamera tidak ditemukan pada perangkat.";
+          _initializing = false;
+        });
+        return;
+      }
+
+      final backIdx = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
+      _selectedCameraIndex = backIdx != -1 ? backIdx : 0;
+
+      await _setupController(_cameras[_selectedCameraIndex]);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Gagal menyalakan kamera. Menggunakan mode sampel.";
+        _initializing = false;
+      });
+    }
+  }
+
+  Future<void> _setupController(CameraDescription camera) async {
+    setState(() => _initializing = true);
+    await _controller?.dispose();
+    _controller = CameraController(camera, ResolutionPreset.medium, enableAudio: false);
+    await _controller!.initialize();
+    if (!mounted) return;
+    setState(() => _initializing = false);
+  }
+
+  Future<void> _switchCamera() async {
+    if (_cameras.length <= 1) return;
+    _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras.length;
+    await _setupController(_cameras[_selectedCameraIndex]);
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _takePhoto() async {
+    if (_capturing) return;
+    setState(() => _capturing = true);
+
+    if (_controller != null && _controller!.value.isInitialized) {
+      try {
+        final XFile photo = await _controller!.takePicture();
+        final Uint8List bytes = await photo.readAsBytes();
+        final String b64 = base64Encode(bytes);
+        widget.onCaptured('data:image/jpeg;base64,$b64');
+        if (mounted) Navigator.pop(context);
+        return;
+      } catch (_) {}
+    }
+
+    widget.onCaptured("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOJM9PDkeODFDZCORQGQzOkjDxub78gAAAAAA");
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Kamera Live Pengunjung', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Row(
+                  children: [
+                    if (_cameras.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.cameraswitch_rounded, color: Color(0xFF00569E)),
+                        tooltip: 'Ganti Kamera Depan / Belakang',
+                        onPressed: _switchCamera,
+                      ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              height: 260,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _initializing
+                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                    : (_error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.camera_front_rounded, size: 48, color: Colors.white54),
+                                const SizedBox(height: 8),
+                                Text(_error!, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+                              ],
+                            ),
+                          )
+                        : Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              CameraPreview(_controller!),
+                              if (_cameras.length > 1)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: InkWell(
+                                    onTap: _switchCamera,
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.6),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: Colors.white24),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.cameraswitch_rounded, size: 14, color: Colors.white),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _cameras[_selectedCameraIndex].lensDirection == CameraLensDirection.front ? 'Kamera Depan' : 'Kamera Belakang',
+                                            style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Batal'))),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00569E), foregroundColor: Colors.white),
+                    onPressed: _capturing ? null : _takePhoto,
+                    icon: _capturing
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.camera_rounded),
+                    label: Text(_capturing ? 'Jepret...' : 'Jepret Foto'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class TambahLogForm extends StatefulWidget {
   final void Function(Map<String, dynamic> log) onSuccess;
   final VoidCallback onCancel;
@@ -1810,14 +2474,74 @@ class _TambahLogFormState extends State<TambahLogForm> {
   final _instansiCtrl = TextEditingController();
   final _keperluanCtrl = TextEditingController();
   String _namaPic = '';
+  String? _fotoBase64;
   bool _saving = false;
   String? _error;
+
+  void _takeVisitorPhoto() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Ambil Foto Pengunjung', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 6),
+            const Text('Pilih metode pengambilan foto bukti fisik pengunjung:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.camera_alt_rounded, color: Color(0xFF00569E))),
+              title: const Text('Gunakan Kamera HP'),
+              subtitle: const Text('Ambil foto langsung pengunjung via kamera'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openCameraCaptureDialog();
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFECFDF5), child: Icon(Icons.badge_rounded, color: Color(0xFF059669))),
+              title: const Text('Gunakan Sample Badge Foto'),
+              subtitle: const Text('Simulasi foto pengunjung terverifikasi'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _fotoBase64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOJM9PDkeODFDZCORQGQzOkjDxub78gAAAAAA";
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openCameraCaptureDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => CameraCaptureDialog(
+        onCaptured: (b64) {
+          setState(() => _fotoBase64 = b64);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Foto pengunjung berhasil diambil!'), backgroundColor: Colors.green),
+            );
+          }
+        },
+      ),
+    );
+  }
 
   Future<void> _submit() async {
     if (_namaCtrl.text.trim().isEmpty) { setState(() => _error = 'Nama orang wajib diisi.'); return; }
     if (_instansiCtrl.text.trim().isEmpty) { setState(() => _error = 'Nama instansi wajib diisi.'); return; }
     if (_namaPic.isEmpty) { setState(() => _error = 'Nama PIC wajib dipilih.'); return; }
     if (_keperluanCtrl.text.trim().isEmpty) { setState(() => _error = 'Keperluan wajib diisi.'); return; }
+    if (_fotoBase64 == null || _fotoBase64!.isEmpty) { setState(() => _error = 'Bukti foto pengunjung wajib diambil.'); return; }
 
     setState(() { _saving = true; _error = null; });
     final result = await _api.createServerLog(
@@ -1825,6 +2549,7 @@ class _TambahLogFormState extends State<TambahLogForm> {
       instansi: _instansiCtrl.text.trim(),
       namaPic: _namaPic,
       keperluan: _keperluanCtrl.text.trim(),
+      fotoUrl: _fotoBase64,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -1884,6 +2609,61 @@ class _TambahLogFormState extends State<TambahLogForm> {
 
             _label('Keperluan', required: true),
             TextFormField(controller: _keperluanCtrl, decoration: const InputDecoration(hintText: 'Mis. Maintenance server, Pengecekan AC...')),
+            const SizedBox(height: 14),
+
+            _label('Bukti Foto Pengunjung', required: true),
+            if (_fotoBase64 != null && _fotoBase64!.isNotEmpty) ...[
+              Container(
+                height: 130,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.memory(
+                        base64Decode(_fotoBase64!.split(',').last.replaceAll(RegExp(r'\s+'), '')),
+                        width: double.infinity,
+                        height: 130,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: 6, right: 6,
+                      child: InkWell(
+                        onTap: () => setState(() => _fotoBase64 = null),
+                        child: const CircleAvatar(
+                          backgroundColor: Colors.black54,
+                          radius: 14,
+                          child: Icon(Icons.close, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEFF6FF),
+                    foregroundColor: const Color(0xFF00569E),
+                    elevation: 0,
+                    side: const BorderSide(color: Color(0xFFBFDBFE)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _takeVisitorPhoto,
+                  icon: const Icon(Icons.camera_alt_rounded),
+                  label: const Text('Ambil Foto Pengunjung (Kamera)'),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             if (_error != null) ...[
               const SizedBox(height: 10),
@@ -1926,17 +2706,16 @@ class MonitoringPage extends StatefulWidget {
   State<MonitoringPage> createState() => _MonitoringPageState();
 }
 
-class _MonitoringPageState extends State<MonitoringPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MonitoringPageState extends State<MonitoringPage> {
   final _api = ApiService();
   List<dynamic> _proses = [];
   List<dynamic> _selesai = [];
   bool _loading = false;
+  int _activeFilterIndex = 0; // 0: Dalam Proses, 1: Selesai
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _fetchAll();
   }
 
@@ -1963,81 +2742,185 @@ class _MonitoringPageState extends State<MonitoringPage> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final activeList = _activeFilterIndex == 0 ? _proses : _selesai;
+    final activeStatusKey = _activeFilterIndex == 0 ? 'proses' : 'selesai';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monitoring Tiket'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchAll)],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            Tab(text: 'DALAM PROSES (${_proses.length})'),
-            Tab(text: 'SELESAI (${_selesai.length})'),
-          ],
-        ),
+        title: const Text('Monitoring Tiket', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _ticketList(_proses, 'proses'),
-                _ticketList(_selesai, 'selesai'),
-              ],
+      body: Column(
+        children: [
+          // Filter Tabs Segmented Control (Menghilangkan bentrok geser horizontal)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => setState(() => _activeFilterIndex = 0),
+                      borderRadius: BorderRadius.circular(9),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        decoration: BoxDecoration(
+                          color: _activeFilterIndex == 0 ? const Color(0xFF00569E) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: _activeFilterIndex == 0
+                              ? [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]
+                              : [],
+                        ),
+                        child: Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.autorenew_rounded,
+                                size: 16,
+                                color: _activeFilterIndex == 0 ? Colors.white : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Dalam Proses (${_proses.length})',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _activeFilterIndex == 0 ? Colors.white : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => setState(() => _activeFilterIndex = 1),
+                      borderRadius: BorderRadius.circular(9),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        decoration: BoxDecoration(
+                          color: _activeFilterIndex == 1 ? const Color(0xFF059669) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: _activeFilterIndex == 1
+                              ? [const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))]
+                              : [],
+                        ),
+                        child: Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 16,
+                                color: _activeFilterIndex == 1 ? Colors.white : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Selesai (${_selesai.length})',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _activeFilterIndex == 1 ? Colors.white : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ),
+          const Divider(height: 1),
+
+          // Body Ticket List
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _ticketList(activeList, activeStatusKey),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _ticketList(List<dynamic> tickets, String status) {
     if (tickets.isEmpty) {
-      return Center(child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Text(status == 'proses' ? 'Tidak ada tiket dalam proses.' : 'Tidak ada tiket selesai.', style: const TextStyle(color: Colors.grey)),
-      ));
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: tickets.length,
-      itemBuilder: (_, i) {
-        final t = tickets[i] as Map<String, dynamic>;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          child: InkWell(
-            onTap: () => _showTicketDetailModal(t),
-            borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: status == 'proses' ? Colors.amber.shade100 : Colors.green.shade100,
-                    child: Icon(
-                      status == 'proses' ? Icons.autorenew_rounded : Icons.check_circle_outline,
-                      color: status == 'proses' ? Colors.amber.shade800 : Colors.green.shade800,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t['noTiket'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'monospace')),
-                        const SizedBox(height: 2),
-                        Text('${t['wsCabang'] ?? ''} • ${t['wsMerekKomputer'] ?? ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                        Text(t['wsKerusakan'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.grey),
-                ],
+      return RefreshIndicator(
+        onRefresh: _fetchAll,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: 300,
+              child: Center(
+                child: Text(
+                  status == 'proses' ? 'Tidak ada tiket dalam proses.' : 'Tidak ada tiket selesai.',
+                  style: const TextStyle(color: Colors.grey),
+                ),
               ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _fetchAll,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(12),
+        itemCount: tickets.length,
+        itemBuilder: (_, i) {
+          final t = tickets[i] as Map<String, dynamic>;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: InkWell(
+              onTap: () => _showTicketDetailModal(t),
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: status == 'proses' ? Colors.amber.shade100 : Colors.green.shade100,
+                      child: Icon(
+                        status == 'proses' ? Icons.autorenew_rounded : Icons.check_circle_outline,
+                        color: status == 'proses' ? Colors.amber.shade800 : Colors.green.shade800,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(t['noTiket'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'monospace')),
+                          const SizedBox(height: 2),
+                          Text('${t['wsCabang'] ?? ''} • ${t['wsMerekKomputer'] ?? ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                          Text(t['wsKerusakan'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2448,4 +3331,144 @@ Widget _sectionHeader(String title, String subtitle) {
       ],
     ),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VISUAL DASHBOARD CUSTOM PAINTERS (Line Chart & Donut Chart)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LineChartPainter extends CustomPainter {
+  final List<dynamic> trendData;
+  _LineChartPainter(this.trendData);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (trendData.isEmpty) return;
+
+    final maxVal = trendData.fold<double>(1.0, (prev, e) {
+      final c = (e['count'] as num?)?.toDouble() ?? 0.0;
+      return c > prev ? c : prev;
+    });
+
+    final points = <Offset>[];
+    final stepX = size.width / (trendData.length - 1 > 0 ? trendData.length - 1 : 1);
+
+    for (int i = 0; i < trendData.length; i++) {
+      final c = (trendData[i]['count'] as num?)?.toDouble() ?? 0.0;
+      final y = size.height - (c / maxVal * (size.height - 24)) - 12;
+      final x = i * stepX;
+      points.add(Offset(x, y));
+    }
+
+    if (points.isEmpty) return;
+
+    // Fill under line
+    final path = Path();
+    path.moveTo(points.first.dx, size.height);
+    path.lineTo(points.first.dx, points.first.dy);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      final controlP1 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p1.dy);
+      final controlP2 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p2.dy);
+      path.cubicTo(controlP1.dx, controlP1.dy, controlP2.dx, controlP2.dy, p2.dx, p2.dy);
+    }
+    path.lineTo(points.last.dx, size.height);
+    path.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [const Color(0xFF00569E).withValues(alpha: 0.35), const Color(0xFF00569E).withValues(alpha: 0.0)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawPath(path, fillPaint);
+
+    // Line stroke
+    final strokePath = Path();
+    strokePath.moveTo(points.first.dx, points.first.dy);
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      final controlP1 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p1.dy);
+      final controlP2 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p2.dy);
+      strokePath.cubicTo(controlP1.dx, controlP1.dy, controlP2.dx, controlP2.dy, p2.dx, p2.dy);
+    }
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF00569E)
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(strokePath, linePaint);
+
+    // Draw last point dot
+    final lastPoint = points.last;
+    final dotOuterPaint = Paint()..color = const Color(0xFF00569E);
+    final dotInnerPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(lastPoint, 5, dotOuterPaint);
+    canvas.drawCircle(lastPoint, 2.5, dotInnerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _DonutChartPainter extends CustomPainter {
+  final List<dynamic> branchData;
+  _DonutChartPainter(this.branchData);
+
+  static const chartColors = [
+    Color(0xFF00569E),
+    Color(0xFF059669),
+    Color(0xFFD97706),
+    Color(0xFF7C3AED),
+    Color(0xFF0284C7),
+    Color(0xFFEC4899),
+    Color(0xFF8B5CF6),
+    Color(0xFF64748B),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (branchData.isEmpty) return;
+
+    final total = branchData.fold<double>(0.0, (prev, e) {
+      return prev + ((e['count'] as num?)?.toDouble() ?? 0.0);
+    });
+    if (total == 0) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2;
+    const strokeWidth = 18.0;
+
+    double startAngle = -math.pi / 2;
+
+    for (int i = 0; i < branchData.length; i++) {
+      final count = (branchData[i]['count'] as num?)?.toDouble() ?? 0.0;
+      final sweepAngle = (count / total) * 2 * math.pi;
+
+      final paint = Paint()
+        ..color = chartColors[i % chartColors.length]
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.butt;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
+        startAngle,
+        sweepAngle > 0.05 ? sweepAngle - 0.04 : sweepAngle,
+        false,
+        paint,
+      );
+
+      startAngle += sweepAngle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

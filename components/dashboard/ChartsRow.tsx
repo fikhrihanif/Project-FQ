@@ -65,8 +65,8 @@ export function ChartsRow({ branchStats, brandStats, dailyTrend }: Props) {
                 <Monitor className="w-4 h-4 text-violet-600" />
               </div>
               <div>
-                <CardTitle>Merek Komputer Sering Bermasalah</CardTitle>
-                <p className="text-xs text-gray-400 mt-0.5">90 hari terakhir, top 6</p>
+                <CardTitle>Perbandingan Merek Komputer &amp; Mesin EDC</CardTitle>
+                <p className="text-xs text-gray-400 mt-0.5">Perbandingan jenis komputer &amp; Mesin EDC bermasalah</p>
               </div>
             </div>
             <BarChartMerek data={brandStats} />

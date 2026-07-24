@@ -128,18 +128,25 @@ export async function getDashboardData(): Promise<DashboardData> {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  // Brand stats
+  // Brand & Device stats (Komputer vs Mesin EDC)
   const brandMap = new Map<string, number>();
   for (const t of allTickets) {
     if (t.wsMerekKomputer) {
-      const merek = t.wsMerekKomputer.split(" ")[0]; // Take first word (brand name)
-      brandMap.set(merek, (brandMap.get(merek) ?? 0) + 1);
+      const raw = t.wsMerekKomputer.trim();
+      let label = raw;
+      if (raw.startsWith("[EDC]")) {
+        label = "Mesin EDC";
+      } else if (raw.includes("]")) {
+        const afterBracket = raw.split("]")[1]?.trim();
+        label = afterBracket || "Komputer";
+      }
+      brandMap.set(label, (brandMap.get(label) ?? 0) + 1);
     }
   }
   const brandStats: BrandStat[] = Array.from(brandMap.entries())
     .map(([merek, count]) => ({ merek, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
+    .slice(0, 8);
 
   // Daily trend (last 30 days)
   const dateMap = new Map<string, number>();

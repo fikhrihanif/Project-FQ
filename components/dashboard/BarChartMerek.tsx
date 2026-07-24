@@ -13,7 +13,16 @@ import {
 import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { BrandStat } from "@/lib/dashboardQueries";
 
-const COLORS = ["#00569E", "#0D9BD2", "#0EA5E9", "#38BDF8", "#7DD3FC", "#BAE6FD"];
+const COLORS = [
+  "#00569E", // Blue
+  "#D97706", // Amber / EDC
+  "#059669", // Emerald
+  "#0284C7", // Sky Blue
+  "#7C3AED", // Purple
+  "#EC4899", // Pink
+  "#8B5CF6", // Violet
+  "#64748B", // Slate
+];
 
 interface Props {
   data: BrandStat[];

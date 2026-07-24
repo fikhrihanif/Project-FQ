@@ -4,7 +4,7 @@ import Image from "next/image";
 import { cn } from "@/lib/cn";
 
 /** Logo bawaan aplikasi (dipakai bila belum ada logo khusus). */
-const DEFAULT_LOGO = "/logo-bank-nagari.svg";
+const DEFAULT_LOGO = "/logo-fq.png";
 
 interface Props {
   /** URL logo aktif (dari app_settings). Null/kosong → logo bawaan. */
@@ -15,14 +15,10 @@ interface Props {
   priority?: boolean;
 }
 
-/**
- * Menampilkan logo aplikasi. Bila ada logo khusus yang diunggah Super Admin,
- * gambar itu yang dipakai; jika tidak, jatuh ke logo SVG Bank Nagari bawaan.
- */
 export function AppLogo({
   logoUrl,
   className,
-  alt = "Logo Bank Nagari",
+  alt = "Logo Fast Queue",
   priority = false,
 }: Props) {
   const src = logoUrl || DEFAULT_LOGO;

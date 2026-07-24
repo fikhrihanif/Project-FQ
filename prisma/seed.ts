@@ -164,9 +164,9 @@ async function seedSampleTickets() {
   console.log(`  tickets: ${samples.length} tiket sampel di-seed`);
 }
 
-// Sample SVG Avatar Data URL untuk foto sampel log server
-const sampleFotoAvatar1 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2300569E'/><circle cx='50' cy='40' r='20' fill='%23FFFFFF'/><path d='M20 90 C20 65 80 65 80 90 Z' fill='%23FFFFFF'/></svg>";
-const sampleFotoAvatar2 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23059669'/><circle cx='50' cy='40' r='20' fill='%23FFFFFF'/><path d='M20 90 C20 65 80 65 80 90 Z' fill='%23FFFFFF'/></svg>";
+// Sample JPEG Base64 Data URL untuk foto sampel log server
+const sampleFotoAvatar1 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOJM9PDkeODFDZCORQGQzOkjDxub78gAAAAAA";
+const sampleFotoAvatar2 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOJM9PDkeODFDZCORQGQzOkjDxub78gAAAAAA";
 
 async function seedServerLogs() {
   const user = await prisma.user.findFirst({ where: { role: "user" } });
@@ -211,7 +211,6 @@ async function main() {
   console.log("Seeding mtr-Report...");
   await seedUsers();
   await seedWorkstationMaster();
-  await seedSampleTickets();
   await seedServerLogs();
   console.log("Selesai.");
 }

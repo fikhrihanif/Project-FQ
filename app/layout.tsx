@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { getLogoUrl } from "@/lib/appSettings";
 
-const DEFAULT_ICON = "/logo-bank-nagari.png";
+const DEFAULT_ICON = "/logo-fq.png";
 
 function iconType(url: string): string {
   const ext = url.split(".").pop()?.toLowerCase();
@@ -21,8 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
     // — pakai ikon default, nilai asli tetap kepakai saat runtime normal.
   }
   return {
-    title: "mtr-Report — Bank Nagari",
-    description: "Sistem Monitoring & Tiket Gangguan ATM Bank Nagari",
+    title: "Fast Queue System",
+    description: "Sistem Pemantauan Gangguan Workstation",
     icons: { icon: [{ url: icon, type: iconType(icon) }] },
   };
 }
