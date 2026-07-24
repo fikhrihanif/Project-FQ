@@ -1666,22 +1666,6 @@ class _InputTiketPageState extends State<InputTiketPage> {
   }
 
   void _scanOcr(String label, TextEditingController ctrl) {
-    if (kIsWeb) {
-      openWebRearCameraCapture((text) {
-        setState(() => ctrl.text = text);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$label berhasil disalin dari Kamera OCR: $text'),
-              backgroundColor: const Color(0xFF00569E),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      }, label);
-      return;
-    }
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1692,9 +1676,9 @@ class _InputTiketPageState extends State<InputTiketPage> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('$label berhasil disalin: $text'),
+                  content: Text('$label berhasil disalin via Kamera OCR: $text'),
                   backgroundColor: const Color(0xFF00569E),
-                  duration: const Duration(seconds: 2),
+                  duration: const Duration(seconds: 3),
                 ),
               );
             }
