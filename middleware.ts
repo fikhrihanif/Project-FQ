@@ -34,6 +34,6 @@ export const config = {
   // di handler-nya (cek Super Admin). uploads/logo dikecualikan karena berkas
   // logo hasil unggahan juga tampil di halaman login (belum ada sesi).
   matcher: [
-    "/((?!api/auth|api/settings/logo|_next/static|_next/image|favicon.ico|logo-bank-nagari.svg|logo-fq.png|uploads/logo).*)",
+    "/((?!api/|mobile/|_next/static|_next/image|favicon.ico|logo-bank-nagari.svg|logo-fq.png|uploads/logo).*)",
   ],
 };

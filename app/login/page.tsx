@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { AppLogo } from "@/components/layout/AppLogo";
 
+import { MobileFrameWrapper } from "@/components/layout/MobileFrameWrapper";
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -64,14 +66,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-900 via-primary to-primary-dark p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-white rounded-2xl shadow-card-lg overflow-hidden">
+    <MobileFrameWrapper>
+      <div className="min-h-full flex-1 flex flex-col justify-center bg-gradient-to-br from-primary-900 via-primary to-primary-dark p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full"
+        >
+          <div className="bg-white rounded-2xl shadow-card-lg overflow-hidden">
           {/* Header */}
           <div className="bg-primary px-8 pt-8 pb-6 text-center">
             <AppLogo logoUrl={logoUrl} className="w-44 h-14 mx-auto mb-3" priority />
@@ -158,5 +161,6 @@ export default function LoginPage() {
         </p>
       </motion.div>
     </div>
+    </MobileFrameWrapper>
   );
 }
