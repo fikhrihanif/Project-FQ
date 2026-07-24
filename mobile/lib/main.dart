@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:camera/camera.dart';
 import 'api/api_service.dart';
 import 'custom_code/widgets/ocr_camera_scanner_widget.dart';
+import 'utils/download_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -575,6 +576,41 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        InkWell(
+                          onTap: downloadApkFile,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                            ),
+                            child: Column(
+                              children: const [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.android_rounded, size: 18, color: Color(0xFF16A34A)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      '📱 Unduh APK Mobile (Auto Vercel API)',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Untuk pengalaman paling lancar di HP Android Anda, klik di sini untuk download APK.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontSize: 10, color: Color(0xFF166534)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                         InkWell(
                           onTap: _showServerConfigDialog,
                           borderRadius: BorderRadius.circular(10),

@@ -43,8 +43,12 @@ class _OcrCameraScannerWidgetState extends State<OcrCameraScannerWidget> {
     try {
       _cameras = await availableCameras();
       if (_cameras.isNotEmpty) {
+        final backCamera = _cameras.firstWhere(
+          (c) => c.lensDirection == CameraLensDirection.back,
+          orElse: () => _cameras.first,
+        );
         _cameraController = CameraController(
-          _cameras.first,
+          backCamera,
           ResolutionPreset.high,
           enableAudio: false,
         );
