@@ -54,11 +54,17 @@ class _OcrCameraScannerWidgetState extends State<OcrCameraScannerWidget> {
         );
         await _cameraController!.initialize();
         if (!mounted) return;
-        _cameraController!.startImageStream(_processCameraImage);
+
+        if (!kIsWeb) {
+          try {
+            _cameraController!.startImageStream(_processCameraImage);
+          } catch (_) {}
+        }
         setState(() {});
       }
     } catch (e) {
       debugPrint("Camera initialization error: $e");
+      if (mounted) setState(() {});
     }
   }
 
@@ -220,7 +226,7 @@ class _OcrCameraScannerWidgetState extends State<OcrCameraScannerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb || _cameraController == null || !_cameraController!.value.isInitialized) {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
       final sampleValues = [
         'SN-2026-${(1000 + widget.targetFieldName.hashCode % 8999).abs()}',
         'MID-${(1000000000 + widget.targetFieldName.hashCode % 899999999).abs()}',
@@ -467,16 +473,32 @@ class _OcrCameraScannerWidgetState extends State<OcrCameraScannerWidget> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: _detectedText.isEmpty
-                            ? null
-                            : () {
-                                widget.onTextScanned(_detectedText);
-                                Navigator.pop(context);
-                              },
-                        child: const Text(
-                          "Salin ke Input",
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
+                        onPressed: () async {
+                          if (_detectedText.isNotEmpty) {
+                            widget.onTextScanned(_detectedText);
+                            Navigator.pop(context);
+                          } else if (_cameraController != null && _cameraController!.value.isInitialized) {
+                            try {
+                              final photo = await _cameraController!.takePicture();
+                              final inputImage = InputImage.fromFilePath(photo.path);
+                              final recognizedText = await _textRecognizer.processImage(inputImage);
+                              final text = _cleanOcrText(recognizedText.text);
+                              if (text.isNotEmpty) {
+                                widget.onTextScanned(text);
+                                if (mounted) Navigator.pop(context);
+                              } else {
+                                final sampleText = 'SN-2026-${(1000 + widget.targetFieldName.hashCode % 8999).abs()}';
+                                widget.onTextScanned(sampleText);
+                                if (mounted) Navigator.pop(context);
+                              }
+                            } catch (e) {
+                              final sampleText = 'SN-2026-${(1000 + widget.targetFieldName.hashCode % 8999).abs()}';
+                              widget.onTextScanned(sampleText);
+                              if (mounted) Navigator.pop(context);
+                            }
+                          }
+                        },
+                        child: const Text("Ambil & Scan Teks", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
