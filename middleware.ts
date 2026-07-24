@@ -3,20 +3,20 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Izinkan API routes, static Next assets, dan berkas Flutter Web tanpa cegatan
-  if (
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/mobile") ||
-    pathname.startsWith("/_next") ||
-    pathname.includes(".")
-  ) {
+  // 1. Izinkan semua API routes Next.js
+  if (pathname.startsWith("/api")) {
     return NextResponse.next();
   }
 
-  // Arahkan SELURUH halaman UI ke Aplikasi Flutter Web (/mobile/index.html)
-  return NextResponse.rewrite(new URL("/mobile/index.html", req.url));
+  // 2. Arahkan semua halaman UI ke /index.html (Flutter Web App)
+  if (!pathname.includes(".")) {
+    return NextResponse.rewrite(new URL("/index.html", req.url));
+  }
+
+  // 3. Izinkan semua berkas statis Flutter Web (JS, WASM, assets)
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
