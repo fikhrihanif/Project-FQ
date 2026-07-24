@@ -9,11 +9,22 @@ String _currentBaseUrl = 'http://192.168.137.1:3000/api';
 String get baseUrl => _currentBaseUrl;
 
 Future<void> setCustomServerIp(String ipOrHost) async {
-  var clean = ipOrHost.trim().replaceAll('http://', '').replaceAll('https://', '').replaceAll('/api', '').replaceAll('/', '');
-  if (!clean.contains(':')) {
-    clean = '$clean:3000';
+  var input = ipOrHost.trim();
+  if (input.isEmpty) return;
+
+  if (input.startsWith('http://') || input.startsWith('https://')) {
+    var clean = input.replaceAll(RegExp(r'/api/?$'), '').replaceAll(RegExp(r'/$'), '');
+    _currentBaseUrl = '$clean/api';
+  } else if (input.contains('.vercel.app') || input.contains('.my.id') || input.contains('.com') || input.contains('.net') || input.contains('.org')) {
+    var clean = input.replaceAll(RegExp(r'/api/?$'), '').replaceAll(RegExp(r'/$'), '');
+    _currentBaseUrl = 'https://$clean/api';
+  } else {
+    if (!input.contains(':')) {
+      input = '$input:3000';
+    }
+    _currentBaseUrl = 'http://$input/api';
   }
-  _currentBaseUrl = 'http://$clean/api';
+
   try {
     await const FlutterSecureStorage().write(key: 'custom_server_url', value: _currentBaseUrl);
   } catch (_) {}
