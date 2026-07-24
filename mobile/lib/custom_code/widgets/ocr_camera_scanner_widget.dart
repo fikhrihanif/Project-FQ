@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import '../../utils/download_helper.dart';
 
 class OcrCameraScannerWidget extends StatefulWidget {
   const OcrCameraScannerWidget({
@@ -272,9 +273,29 @@ class _OcrCameraScannerWidgetState extends State<OcrCameraScannerWidget> {
                         border: Border.all(color: const Color(0xFF0284C7)),
                       ),
                       child: const Text(
-                        "📱 Fitur Pemindaian OCR Kamera MLKit versi Native (APK Android) aktif 100% menggunakan Kamera Belakang pada HP Android Anda.",
+                        "📱 Tekan tombol di bawah untuk membuka Kamera Belakang HP Android Anda dan mengambil foto dokumen secara langsung:",
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 11, color: Color(0xFFBAE6FD)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          openWebRearCameraCapture((scannedText) {
+                            widget.onTextScanned(scannedText);
+                            if (mounted) Navigator.pop(context);
+                          }, widget.targetFieldName);
+                        },
+                        icon: const Icon(Icons.camera_alt_rounded, size: 20),
+                        label: const Text("📸 Buka Kamera Belakang HP (Foto & Scan)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ),
                   ],
