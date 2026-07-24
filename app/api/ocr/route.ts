@@ -100,10 +100,11 @@ export async function POST(req: NextRequest) {
       text: extracted || rawText.trim(),
       rawText: rawText.trim(),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     console.error("OCR API error:", err);
     return NextResponse.json(
-      { error: "Gagal memproses OCR gambar.", details: err?.message },
+      { error: "Gagal memproses OCR gambar.", details: errorMsg },
       { status: 500 }
     );
   }
