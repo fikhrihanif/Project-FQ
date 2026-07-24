@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:camera/camera.dart';
 import 'api/api_service.dart';
@@ -1665,6 +1666,22 @@ class _InputTiketPageState extends State<InputTiketPage> {
   }
 
   void _scanOcr(String label, TextEditingController ctrl) {
+    if (kIsWeb) {
+      openWebRearCameraCapture((text) {
+        setState(() => ctrl.text = text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$label berhasil disalin dari Kamera OCR: $text'),
+              backgroundColor: const Color(0xFF00569E),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }, label);
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1672,13 +1689,15 @@ class _InputTiketPageState extends State<InputTiketPage> {
           targetFieldName: label,
           onTextScanned: (text) {
             setState(() => ctrl.text = text);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$label berhasil disalin: $text'),
-                backgroundColor: const Color(0xFF00569E),
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$label berhasil disalin: $text'),
+                  backgroundColor: const Color(0xFF00569E),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
           },
         ),
       ),
