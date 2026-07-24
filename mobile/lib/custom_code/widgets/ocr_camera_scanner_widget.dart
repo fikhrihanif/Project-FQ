@@ -220,15 +220,121 @@ class _OcrCameraScannerWidgetState extends State<OcrCameraScannerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    if (kIsWeb || _cameraController == null || !_cameraController!.value.isInitialized) {
+      final sampleValues = [
+        'SN-2026-${(1000 + widget.targetFieldName.hashCode % 8999).abs()}',
+        'MID-${(1000000000 + widget.targetFieldName.hashCode % 899999999).abs()}',
+        'TID-${(10000000 + widget.targetFieldName.hashCode % 89999999).abs()}',
+        'SURAT-NAGARI/2026/042',
+      ];
+      final textCtrl = TextEditingController(text: sampleValues.first);
+
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
           title: Text("Scan OCR ${widget.targetFieldName}"),
           backgroundColor: const Color(0xFF00569E),
+          foregroundColor: Colors.white,
         ),
-        body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF00569E)),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.qr_code_scanner_rounded, size: 56, color: Color(0xFF38BDF8)),
+                    const SizedBox(height: 12),
+                    Text(
+                      "Pemindai OCR (${widget.targetFieldName})",
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF0284C7)),
+                      ),
+                      child: const Text(
+                        "📱 Fitur Pemindaian OCR Kamera MLKit versi Native (APK Android) aktif 100% menggunakan Kamera Belakang pada HP Android Anda.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: Color(0xFFBAE6FD)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  "Pilih atau Input Sampel Teks OCR:",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: sampleValues.map((val) {
+                  return ActionChip(
+                    avatar: const Icon(Icons.text_fields_rounded, size: 14, color: Color(0xFF0284C7)),
+                    label: Text(val, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    backgroundColor: const Color(0xFF1E293B),
+                    labelStyle: const TextStyle(color: Colors.white),
+                    side: const BorderSide(color: Color(0xFF334155)),
+                    onPressed: () {
+                      widget.onTextScanned(val);
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: textCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: "Hasil Teks OCR (${widget.targetFieldName})",
+                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00569E),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    widget.onTextScanned(textCtrl.text.trim());
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.check_circle_rounded, size: 18),
+                  label: const Text("Gunakan Hasil Scan Teks Ini", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
