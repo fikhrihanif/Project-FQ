@@ -1,39 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE_NAME, verifySession } from "@/lib/jwt";
-import { canAccess } from "@/lib/rbac";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const token = req.cookies.get(COOKIE_NAME)?.value;
-  const session = token ? await verifySession(token) : null;
 
-  // Halaman login: kalau sudah login, arahkan ke dashboard.
-  if (pathname === "/login") {
-    if (session) return NextResponse.redirect(new URL("/dashboard", req.url));
+  // Izinkan API routes, static Next assets, dan berkas Flutter Web tanpa cegatan
+  if (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/mobile") ||
+    pathname.startsWith("/_next") ||
+    pathname.includes(".")
+  ) {
     return NextResponse.next();
   }
 
-  // Belum login → ke /login (simpan tujuan asal).
-  if (!session) {
-    const url = new URL("/login", req.url);
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  // RBAC: role tidak boleh akses route ini → balik ke dashboard.
-  if (!canAccess(session.role, pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-
-  return NextResponse.next();
+  // Arahkan SELURUH halaman UI ke Aplikasi Flutter Web (/mobile/index.html)
+  return NextResponse.rewrite(new URL("/mobile/index.html", req.url));
 }
 
 export const config = {
-  // Proteksi semua route kecuali API auth, GET logo publik (dipakai halaman
-  // login), asset statis Next, dan file publik. POST/DELETE logo tetap diamankan
-  // di handler-nya (cek Super Admin). uploads/logo dikecualikan karena berkas
-  // logo hasil unggahan juga tampil di halaman login (belum ada sesi).
-  matcher: [
-    "/((?!api/|mobile/|_next/static|_next/image|favicon.ico|logo-bank-nagari.svg|logo-fq.png|uploads/logo).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
