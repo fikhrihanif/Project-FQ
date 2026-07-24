@@ -329,8 +329,8 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: ipCtrl,
               decoration: InputDecoration(
-                labelText: 'Host IP & Port',
-                hintText: '192.168.137.1:3000',
+                labelText: 'Host IP / URL Server',
+                hintText: 'https://project-fq.vercel.app',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.dns_rounded),
               ),
@@ -342,17 +342,17 @@ class _LoginScreenState extends State<LoginScreen> {
               spacing: 6,
               children: [
                 ActionChip(
-                  avatar: const Icon(Icons.cell_wifi_rounded, size: 14),
-                  label: const Text('Hotspot Laptop (192.168.137.1)', style: TextStyle(fontSize: 11)),
+                  avatar: const Icon(Icons.cloud_done_rounded, size: 14, color: Colors.blue),
+                  label: const Text('Vercel Cloud Online', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   onPressed: () {
-                    ipCtrl.text = '192.168.137.1:3000';
+                    ipCtrl.text = 'https://project-fq.vercel.app';
                   },
                 ),
                 ActionChip(
-                  avatar: const Icon(Icons.computer_rounded, size: 14),
-                  label: const Text('Localhost (10.0.2.2:3000)', style: TextStyle(fontSize: 11)),
+                  avatar: const Icon(Icons.cell_wifi_rounded, size: 14),
+                  label: const Text('Hotspot (192.168.137.1)', style: TextStyle(fontSize: 11)),
                   onPressed: () {
-                    ipCtrl.text = '10.0.2.2:3000';
+                    ipCtrl.text = '192.168.137.1:3000';
                   },
                 ),
               ],

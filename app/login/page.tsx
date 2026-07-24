@@ -127,6 +127,21 @@ export default function LoginPage() {
               </motion.div>
             )}
 
+            {/* Demo Credential Note */}
+            <div
+              onClick={() => {
+                setUsername("user1");
+                setPassword("user1");
+              }}
+              className="cursor-pointer bg-blue-50 hover:bg-blue-100/80 transition-colors border border-blue-200 rounded-xl p-3 text-center text-xs text-blue-900 shadow-sm"
+              title="Klik untuk otomatis isi form login"
+            >
+              <p className="font-semibold text-blue-900 mb-1">💡 Kredensial Login Demo (Klik di sini):</p>
+              <p className="font-mono text-[11px] font-bold text-blue-950 bg-white py-1 px-2.5 rounded-lg border border-blue-200 inline-block shadow-2xs">
+                pengguna : user1, password : user1
+              </p>
+            </div>
+
             <Button
               type="submit"
               size="lg"

@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // ─── BASE URL DINAMIS ────────────────────────────────────────────────────────
-// Default Hotspot Windows IP: 192.168.137.1 (Bisa diubah secara langsung via menu di HP)
-String _currentBaseUrl = 'http://192.168.137.1:3000/api';
+// Default Server Online Vercel: https://project-fq.vercel.app/api
+String _currentBaseUrl = 'https://project-fq.vercel.app/api';
 
 String get baseUrl => _currentBaseUrl;
 
