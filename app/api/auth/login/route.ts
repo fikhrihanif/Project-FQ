@@ -17,7 +17,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { username } });
+  let user;
+  try {
+    user = await prisma.user.findUnique({ where: { username } });
+  } catch (err: unknown) {
+    console.error("Login DB Error:", err);
+    return NextResponse.json(
+      { error: "Gagal terhubung ke database. Periksa DATABASE_URL di Vercel." },
+      { status: 500 }
+    );
+  }
+
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json(
       { error: "Username atau password salah." },
